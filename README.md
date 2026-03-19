@@ -137,6 +137,102 @@ foxfire/
 - **Add profiles**: Drop a new `.sh` script in `signals/`, source `config.env`, add corresponding config variables, and enable it in `rabbit.sh`'s `build_playlist()`.
 - **Monitor your own output**: The RTL-SDR can be used separately to verify what the HackRF is actually putting out. Use `rtl_power` for a quick spectrum sweep.
 
+## Speculative Range & Power Analysis
+
+The HackRF One is not a power amplifier — it's an SDR. Understanding its actual output and what that means for detection range is critical for planning your fox hunt area.
+
+### HackRF One TX Power Budget
+
+| Parameter | Value |
+|-----------|-------|
+| Max TX output (at SMA connector) | ~10-15 dBm (10-30 mW) depending on frequency |
+| RF amp enabled (`-a 1`) | Adds ~11 dB, but actual output plateaus around 10-15 dBm total |
+| TX VGA gain (`-x 47`) | Sets IF gain, but the analog frontend is the bottleneck |
+| Usable TX range | 1 MHz - 6 GHz |
+| Output impedance | 50 ohm |
+
+**Reality check**: The HackRF's output power is roughly constant across its range, but efficiency drops significantly above ~2 GHz. At 5.8 GHz you may only see 0-5 dBm at the connector. The numbers below assume ~10 dBm (10 mW) as a conservative baseline.
+
+### Per-Profile Range Estimates
+
+These are **speculative estimates** based on free-space path loss (FSPL), typical receiver sensitivities, and practical field conditions. Real-world range depends heavily on antenna choice, terrain, obstructions, weather, and the sensitivity of the spectrum analyzer being used to hunt.
+
+#### ICOM Profile — 146.52 MHz (2m band)
+
+| Scenario | Estimated Detection Range |
+|----------|--------------------------|
+| HackRF rubber duck → SA with rubber duck, urban | 200-800 m (650 ft - 0.5 mi) |
+| HackRF 1/4-wave whip → SA with directional yagi | 1-4 km (0.6-2.5 mi) |
+| HackRF 1/4-wave whip → SA with rubber duck, open field | 0.5-2 km (0.3-1.2 mi) |
+| HackRF J-pole → sensitive receiver (-130 dBm), line of sight | 5-15 km (3-9 mi) |
+
+**Why relatively far for 10 mW**: VHF at 146 MHz has low free-space path loss (~31 dB at 1 km). The wavelength is ~2m, so it diffracts well around obstacles. Amateur receivers are extremely sensitive (-120 to -130 dBm). A proper spectrum analyzer in max hold with a narrow RBW can pull signals out of the noise floor at remarkable distances. For context, 10 mW on 2m is roughly equivalent to a handheld turned down to its lowest power setting — and hams routinely make contacts at that level with good antennas.
+
+**FSPL at 146 MHz**: ~31 dB/km. With 10 dBm TX and a -120 dBm receiver, you have a 130 dB link budget — good for ~30 km in theoretical free space. Real-world terrain cuts this dramatically.
+
+#### Walkie-Talkie Profile — 462.5625 MHz (UHF)
+
+| Scenario | Estimated Detection Range |
+|----------|--------------------------|
+| Rubber duck → SA rubber duck, urban | 100-400 m (300-1300 ft) |
+| Rubber duck → SA rubber duck, open field | 300-800 m (1000 ft - 0.5 mi) |
+| 1/4-wave whip → SA with directional, open field | 0.5-2 km (0.3-1.2 mi) |
+| 1/4-wave whip → sensitive receiver, line of sight | 2-8 km (1.2-5 mi) |
+
+**Why shorter than ICOM**: UHF at 462 MHz has ~10 dB more path loss per km than 2m. The wavelength (~65 cm) doesn't diffract around buildings as well. Real FRS radios run 2W (33 dBm) — we're ~23 dB below that, so expect roughly 1/14th the range of a real walkie-talkie in comparable conditions.
+
+**FSPL at 462 MHz**: ~41 dB/km.
+
+#### LoRa Profile — 915 MHz (ISM band)
+
+| Scenario | Estimated Detection Range |
+|----------|--------------------------|
+| Rubber duck → SA rubber duck, urban | 200-600 m (650 ft - 0.4 mi) |
+| 915 MHz whip → SA with appropriate antenna, open field | 0.5-3 km (0.3-1.9 mi) |
+| 915 MHz whip → LoRa receiver (SF12, -137 dBm sensitivity) | 3-10 km (1.9-6.2 mi) |
+| With directional antennas both sides, line of sight | 5-20 km (3-12 mi) |
+
+**Why surprisingly far**: LoRa's chirp spread spectrum has ~20 dB of processing gain over conventional modulation. A real LoRa receiver at SF12/125kHz has sensitivity around -137 dBm — that's 10-17 dB better than a typical FM receiver. On a spectrum analyzer, the CSS signal is spread across 125 kHz of bandwidth, so it will appear closer to the noise floor than the narrow FM profiles. You'll see it as a distinctive "chirp" waterfall pattern rather than a clean carrier. A spectrum analyzer in zero-span or waterfall mode with narrow RBW is best for spotting it.
+
+**FSPL at 915 MHz**: ~47 dB/km. But the processing gain effectively gives you free dB at the receiver.
+
+#### WiFi Profile — 2.4 GHz / 5 GHz
+
+| Scenario | Estimated Detection Range |
+|----------|--------------------------|
+| Beryl 2.4 GHz → SA, indoor | 15-40 m (50-130 ft) |
+| Beryl 2.4 GHz → SA with 2.4 GHz yagi, outdoor | 100-500 m (300 ft - 0.3 mi) |
+| Beryl 5 GHz → SA, indoor | 5-20 m (15-65 ft) |
+| Beryl 5 GHz → SA with directional, outdoor | 30-150 m (100-500 ft) |
+
+**Note**: WiFi range here is from the **Beryl router**, not the HackRF. The Beryl runs ~20 dBm (100 mW) on 2.4 GHz and ~17 dBm (50 mW) on 5 GHz — significantly more power than the HackRF profiles. However, WiFi uses much higher frequencies with correspondingly higher path loss. 5 GHz is especially short-range and heavily attenuated by walls and foliage.
+
+On a spectrum analyzer, the WiFi signal will be the widest and most obvious — 20 MHz or 40 MHz channel bandwidth with distinctive OFDM humps. Easy to spot, hard to miss.
+
+### Antenna Impact Summary
+
+The single biggest variable in detection range is antenna choice. These are rough gain figures:
+
+| Antenna | Gain | Best For |
+|---------|------|----------|
+| HackRF rubber duck (stock) | -2 to 2 dBi | Omnidirectional, all profiles, short range |
+| 1/4-wave ground plane (DIY) | 2-3 dBi | Specific band, good omnidirectional baseline |
+| J-pole / slim jim | 3-6 dBi | VHF/UHF, good omnidirectional gain |
+| Wideband discone | 0-3 dBi | Covers all HackRF profiles with one antenna |
+| Yagi (on SA side) | 8-15 dBi | Directional hunting, dramatically extends detection range |
+| Helical (915 MHz) | 10-14 dBi | LoRa profile, circular polarization |
+
+**Rule of thumb**: Every 6 dB of antenna gain doubles your detection range. Swapping the stock rubber duck for a band-matched whip on the HackRF and a yagi on the spectrum analyzer can increase range by 4-10x.
+
+### Planning Your Fox Hunt Area
+
+| Difficulty | Setup | Approximate Radius |
+|------------|-------|--------------------|
+| Beginner | All profiles on, stock antennas, open park | 200-500 m |
+| Intermediate | Reduced TX gain (20 dB), mixed terrain, band-matched antennas | 500 m - 2 km |
+| Advanced | Single profile enabled, long cycle pauses, minimal TX gain, concealed in urban area | 1-5 km |
+| Expert | LoRa only, low gain, directional antenna pointing away from start, heavy foliage | 2-10+ km |
+
 ## Troubleshooting
 
 ### HackRF not detected / `hackrf_info` fails
