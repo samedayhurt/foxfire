@@ -65,12 +65,14 @@ for burst in $(seq 1 "$ICOM_BURSTS"); do
 
     generate_nbfm_iq "$duration"
 
+    filesize=$(stat -c%s "$TMPFILE")
     hackrf_transfer \
         -t "$TMPFILE" \
         -f "$ICOM_FREQ" \
         -s "$SAMPLE_RATE" \
         -x "$HACKRF_TX_GAIN" \
-        -R 2>/dev/null || log "WARNING: hackrf_transfer exited non-zero"
+        -a 1 \
+        -n "$filesize" 2>&1 | tail -3 || log "WARNING: hackrf_transfer exited non-zero"
 
     # Inter-burst pause (simulates listening/waiting for reply)
     pause=$(( RANDOM % 5 + 2 ))

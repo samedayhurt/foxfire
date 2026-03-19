@@ -137,6 +137,50 @@ foxfire/
 - **Add profiles**: Drop a new `.sh` script in `signals/`, source `config.env`, add corresponding config variables, and enable it in `rabbit.sh`'s `build_playlist()`.
 - **Monitor your own output**: The RTL-SDR can be used separately to verify what the HackRF is actually putting out. Use `rtl_power` for a quick spectrum sweep.
 
+## Troubleshooting
+
+### HackRF not detected / `hackrf_info` fails
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `No HackRF boards found` | Not plugged in, or USB hub issue | Plug HackRF directly into a Pi USB port, not through a hub |
+| `Input/Output Error (-1000)` | USB power insufficient or flaky connection | Use a powered USB hub or plug directly into Pi USB 3.0 (blue) port. Try a different cable. |
+| `Resource busy (-1000)` | Another process (like rf-rabbit service) already has the device open | `sudo systemctl stop rf-rabbit` before running manual commands |
+| HackRF disappears after USB reset | Known Pi 4 USB controller quirk | Physically unplug and replug the HackRF |
+
+### Service crashes / restart loop
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `hackrf_transfer` dumps usage help and exits | Bad arguments to hackrf_transfer | Check that IQ file was generated (look for `/tmp/*_iq.raw`). Ensure config.env values are valid numbers. |
+| Pi becomes unresponsive | Service restart loop (10s intervals) with RTL-SDR wait (60s each) saturating resources | Power cycle Pi, then `sudo systemctl stop rf-rabbit` immediately on boot. Disable RTL-SDR wait or set `RTLSDR_ENABLED=false` if no RTL-SDR is connected. |
+| `set -e` kills the script unexpectedly | Any command returning non-zero exits the whole script | Check `journalctl -u rf-rabbit` for the exact failing line |
+
+### WiFi traffic not working
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `Could not connect to <SSID>` | Wrong SSID/password, or Beryl not powered on | Verify `WIFI_SSID` and `WIFI_PASSWORD` in config.env. Ensure Beryl is on and broadcasting. |
+| `nmcli` not found | NetworkManager not installed | `sudo apt install network-manager` and ensure it manages wlan0 |
+| iperf3 shows no throughput | No iperf3 server on Beryl | The script falls back to HTTP requests automatically. For full throughput testing, install iperf3 on the Beryl via its package manager. |
+
+### USB Power Budget
+
+The Pi 4 supplies limited current over USB. Running HackRF + RTL-SDR + Ubertooth simultaneously through a passive hub will cause brownouts. Solutions:
+- Use a **powered** USB hub (5V/2A+ per port)
+- Plug the HackRF directly into the Pi (it draws the most current during TX)
+- If devices keep disconnecting, reduce `HACKRF_TX_GAIN` — higher gain = higher current draw
+
+### Verifying Transmissions
+
+If you're unsure whether the HackRF is actually transmitting:
+```bash
+# Quick manual test (transmit 1s of silence on 915MHz)
+dd if=/dev/zero bs=2000000 count=2 > /tmp/test.raw
+sudo hackrf_transfer -t /tmp/test.raw -f 915000000 -s 2000000 -x 47 -a 1 -n 4000000
+```
+You should see `MiB/second` throughput in the output and a carrier on your spectrum analyzer at 915MHz.
+
 ## Legal
 
 **You must hold appropriate licenses to transmit on any frequency.** In the US: amateur radio license for 2m/70cm, no license needed for ISM 915MHz at low power, FRS frequencies have specific rules. Check your local regulations. The authors assume no liability for illegal use.

@@ -60,12 +60,14 @@ for burst in $(seq 1 "$WALKIE_BURSTS"); do
 
     generate_walkie_iq "$duration"
 
+    filesize=$(stat -c%s "$TMPFILE")
     hackrf_transfer \
         -t "$TMPFILE" \
         -f "$WALKIE_FREQ" \
         -s "$SAMPLE_RATE" \
         -x "$HACKRF_TX_GAIN" \
-        -R 2>/dev/null || log "WARNING: hackrf_transfer exited non-zero"
+        -a 1 \
+        -n "$filesize" 2>&1 | tail -3 || log "WARNING: hackrf_transfer exited non-zero"
 
     # Short pause (walkie-talkie conversations are snappy)
     pause=$(( RANDOM % 3 + 1 ))

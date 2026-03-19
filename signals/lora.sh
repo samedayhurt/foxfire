@@ -75,12 +75,14 @@ for burst in $(seq 1 "$LORA_BURSTS"); do
 
     generate_lora_iq "$num_symbols"
 
+    filesize=$(stat -c%s "$TMPFILE")
     hackrf_transfer \
         -t "$TMPFILE" \
         -f "$LORA_FREQ" \
         -s "$SAMPLE_RATE" \
         -x "$HACKRF_TX_GAIN" \
-        -R 2>/dev/null || log "WARNING: hackrf_transfer exited non-zero"
+        -a 1 \
+        -n "$filesize" 2>&1 | tail -3 || log "WARNING: hackrf_transfer exited non-zero"
 
     # LoRa devices have variable duty cycles
     pause=$(( RANDOM % 8 + 2 ))

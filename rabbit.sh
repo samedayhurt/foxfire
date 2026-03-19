@@ -14,8 +14,8 @@ cleanup() {
     log "Shutting down RF Rabbit..."
     # Kill all child processes
     pkill -P $$ 2>/dev/null || true
-    # Release HackRF
-    hackrf_transfer -R 2>/dev/null || true
+    # Kill any lingering hackrf_transfer
+    pkill hackrf_transfer 2>/dev/null || true
     log "Stopped."
 }
 trap cleanup EXIT INT TERM
