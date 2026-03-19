@@ -1,0 +1,17 @@
+[Unit]
+Description=RF Rabbit Signal Emitter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/opt/rf-rabbit/config.env
+ExecStart=/opt/rf-rabbit/rabbit.sh
+Restart=on-failure
+RestartSec=10
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
